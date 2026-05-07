@@ -1,0 +1,10 @@
+namespace zwm_lubrificante_srv.
+
+@EndUserText.label: 'Behavior Implementation for Lubrificante Baixa'
+@ObjectModel.behaviorDefinition: [ { unmanaged: true } ]
+define behavior for zwm_lubrificante_baixa alias LubrificanteBaixa
+{
+  create;
+  update;
+  delete;
+}
