@@ -1,19 +1,18 @@
-@EndUserText.label: 'Lubrificante Baixa Service'
-define service ZWM_LUBRIFICANTE_SRV {
-  expose ZWM_LUBRIFICANTE_BAIXA;
-}
+namespace zwm_lubrificante_srv.
 
-@EndUserText.label: 'Lubrificante Baixa Entity'
-define entity ZWM_LUBRIFICANTE_BAIXA {
-  key Material       : abap.char(18);
-      Quantidade     : abap.dec(15,3);
-      Centro         : abap.char(4);
-      Deposito       : abap.char(4);
-      Lote           : abap.char(10);
-      DataBaixa      : abap.dats;
-      MotivoBaixa    : abap.char(3);
-      Responsavel    : abap.char(12);
-      TOGerada       : abap.char(10);
-      Status         : abap.char(1);
-      Mensagem       : abap.char(200);
+entity LubrificanteBaixa {
+  key Matnr : abap.char(18);
+  Werks   : abap.char(4);
+  LGORT   : abap.char(4);
+  CHARG   : abap.char(10);
+  MENGE   : abap.decimal(15,3);
+  ERFMG   : abap.decimal(15,3);
+  ERFME   : abap.char(3);
+  LGNUM   : abap.char(4);
+  LGTYP   : abap.char(3);
+  LGNUM   : abap.char(4);
+  LGTYP   : abap.char(3);
+  TO_NUMBER : abap.char(12);
+  STATUS  : abap.char(4);
+  MESSAGE : abap.char(200);
 }
