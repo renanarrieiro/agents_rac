@@ -1,8 +1,5 @@
 *&---------------------------------------------------------------------*
-*& Classe ZCL_TO_ERROR_HANDLER
-*&---------------------------------------------------------------------*
-*& Descrição: Handler para tratamento de erros e logging da API de baixa
-*&            de lubrificantes utilizando SLG1 e BAPIRET2
+*& Classe de tratamento de erros para Transfer Order (TO)
 *&---------------------------------------------------------------------*
 CLASS zcl_to_error_handler DEFINITION
   PUBLIC
@@ -10,215 +7,192 @@ CLASS zcl_to_error_handler DEFINITION
   CREATE PUBLIC.
 
   PUBLIC SECTION.
-    "! Construtor
-    METHODS constructor
-      IMPORTING
-        !iv_object   TYPE balobj_d DEFAULT 'ZTO'
-        !iv_subobj   TYPE balobj_d DEFAULT 'LUBRIFICANTE'
-        !iv_extnumber TYPE balnrext OPTIONAL.
-
-    "! Processa mensagens BAPIRET2 e realiza logging via SLG1
-    "! @parameter it_bapiret2 | Tabela de mensagens BAPIRET2
-    "! @parameter iv_commit   | Indica se deve fazer commit após logging
-    METHODS process_messages
-      IMPORTING
-        !it_bapiret2 TYPE bapiret2_tab
-        !iv_commit   TYPE abap_bool DEFAULT abap_false.
-
-    "! Cria mensagem de erro personalizado na classe ZCX_TO_ERROR
-    "! @parameter iv_text     | Texto da mensagem
-    "! @parameter iv_type     | Tipo da mensagem (E=Error, W=Warning, I=Info, S=Success)
-    "! @parameter iv_number   | Número da mensagem
-      METHODS create_error_message
+    METHODS:
+      "! Processa mensagens de erro do BAPIRET2 e gera exceções customizadas
+      "! @param bapiret2_tab Tabela de mensagens BAPIRET2
+      "! @param operation Operação sendo executada (CREATE/CONFIRM)
+      "! @return Exceção customizada se houver erro
+      process_bapiret2_messages
         IMPORTING
-          !iv_text   TYPE string
-          !iv_type   TYPE bapi_msgty DEFAULT 'E'
-          !iv_number TYPE symsgno DEFAULT '000'.
+          bapiret2_tab TYPE bapiret2_t
+          operation    TYPE string
+        RETURNING
+          VALUE(result) TYPE REF TO zcx_to_error,
 
-    "! Valida se há erros nas mensagens BAPIRET2
-    "! @parameter it_bapiret2 | Tabela de mensagens BAPIRET2
-    "! @return(abap_bool) | True se houver erros
-    METHODS has_errors
-      IMPORTING
-        !it_bapiret2 TYPE bapiret2_tab
-      RETURNING
-        VALUE(rv_has_errors) TYPE abap_bool.
+      "! Registra log de erro no SLG1 para erros de negócio
+      "! @param error_code Código de erro
+      "! @param message Mensagem de erro
+      "! @param additional_info Informações adicionais
+      log_business_error
+        IMPORTING
+          error_code      TYPE zto_error_code
+          message         TYPE string
+          additional_info TYPE string OPTIONAL,
+
+      "! Verifica se há erros críticos que exigem rollback
+      "! @param bapiret2_tab Tabela de mensagens BAPIRET2
+      "! @return ABAP_TRUE se houver erro crítico
+      has_critical_error
+        IMPORTING
+          bapiret2_tab TYPE bapiret2_t
+        RETURNING
+          VALUE(has_error) TYPE abap_bool,
+
+      "! Formata mensagem BAPIRET2 para retorno estruturado
+      "! @param bapiret2 Mensagem BAPIRET2 individual
+      "! @return Mensagem formatada
+      format_bapiret2_message
+        IMPORTING
+          bapiret2      TYPE bapiret2
+        RETURNING
+          VALUE(formatted_msg) TYPE string.
 
   PRIVATE SECTION.
-    DATA: mo_logger TYPE REF TO zcl_to_error_handler,
-          mv_object TYPE balobj_d,
-          mv_subobj TYPE balobj_d,
-          mv_extnumber TYPE balnrext.
+    METHODS:
+      "! Determina o tipo de erro com base na mensagem BAPIRET2
+      "! @param bapiret2 Mensagem BAPIRET2
+      "! @return Tipo de erro
+      get_error_type
+        IMPORTING
+          bapiret2      TYPE bapiret2
+        RETURNING
+          VALUE(error_type) TYPE zto_error_type,
 
-    "! Cria log no SLG1
-    "! @parameter iv_msgty   | Tipo da mensagem
-    "! @parameter iv_msgv1   | Variável 1 da mensagem
-    "! @parameter iv_msgv2   | Variável 2 da mensagem
-    "! @parameter iv_msgv3   | Variável 3 da mensagem
-    "! @parameter iv_msgv4   | Variável 4 da mensagem
-    "! @parameter iv_msgid   | ID da mensagem
-    "! @parameter iv_msgno   | Número da mensagem
-    "! @parameter iv_msgv1   | Texto da mensagem
-    METHODS create_log_entry
-      IMPORTING
-        !iv_msgty   TYPE balmsgty
-        !iv_msgv1   TYPE any
-        !iv_msgv2   TYPE any
-        !iv_msgv3   TYPE any
-        !iv_msgv4   TYPE any
-        !iv_msgid   TYPE symsgid
-        !iv_msgno   TYPE symsgno
-        !iv_text    TYPE any.
-
+      "! Gera código de erro customizado
+      "! @param operation Operação
+      "! @param bapiret2 Mensagem BAPIRET2
+      "! @return Código de erro
+      generate_error_code
+        IMPORTING
+          operation     TYPE string
+          bapiret2      TYPE bapiret2
+        RETURNING
+          VALUE(error_code) TYPE zto_error_code.
 ENDCLASS.
 
-*&---------------------------------------------------------------------*
-*& Classe ZCL_TO_ERROR_HANDLER - Implementação
-*&---------------------------------------------------------------------*
 CLASS zcl_to_error_handler IMPLEMENTATION.
+  METHOD process_bapiret2_messages.
+    DATA: lt_errors TYPE bapiret2_t,
+          ls_error  TYPE bapiret2.
 
-  METHOD constructor.
-    mv_object = iv_object.
-    mv_subobj = iv_subobj.
-    mv_extnumber = iv_extnumber.
-  ENDMETHOD.
+    " Filtra apenas mensagens de erro
+    lt_errors = VALUE #( FOR ls_msg IN bapiret2_tab
+                       WHERE ( type CA 'EA' )  " E=Error, A=Abort
+                       ( ls_msg ) ).
 
-  METHOD process_messages.
-    DATA: ls_bapiret2 TYPE bapiret2,
-          lv_logno    TYPE ballogno,
-          lv_log_msg_no TYPE balmsgno.
-
-    LOOP AT it_bapiret2 INTO ls_bapiret2.
-      " Determinar o número da mensagem no log
-      lv_log_msg_no = sy-tabix.
-
-      " Criar entrada no log SLG1
-      me->create_log_entry(
-        EXPORTING
-          iv_msgty   = ls_bapiret2-type
-          iv_msgv1   = ls_bapiret2-message_v1
-          iv_msgv2   = ls_bapiret2-message_v2
-          iv_msgv3   = ls_bapiret2-message_v3
-          iv_msgv4   = ls_bapiret2-message_v4
-          iv_msgid   = ls_bapiret2-id
-          iv_msgno   = ls_bapiret2-number
-          iv_text    = ls_bapiret2-message
-      ).
-
-      " Se for erro, lançar exceção
-      IF ls_bapiret2-type CA 'EA'.
-        RAISE EXCEPTION TYPE zcx_to_error
-          EXPORTING
-            textid   = zcx_to_error=>business_error
-            previous = NEW zcx_to_error( text = ls_bapiret2-message )
-            msgty    = ls_bapiret2-type
-            msgid    = ls_bapiret2-id
-            msgno    = ls_bapiret2-number
-            msgv1    = ls_bapiret2-message_v1
-            msgv2    = ls_bapiret2-message_v2
-            msgv3    = ls_bapiret2-message_v3
-            msgv4    = ls_bapiret2-message_v4.
-      ENDIF.
-    ENDLOOP.
-
-    " Fazer commit se solicitado
-    IF iv_commit = abap_true.
-      COMMIT WORK AND WAIT.
-    ENDIF.
-  ENDMETHOD.
-
-  METHOD create_error_message.
-    DATA: ls_bapiret2 TYPE bapiret2.
-
-    ls_bapiret2-type = iv_type.
-    ls_bapiret2-id = 'ZTO'.
-    ls_bapiret2-number = iv_number.
-    ls_bapiret2-message = iv_text.
-    ls_bapiret2-message_v1 = iv_text.
-    ls_bapiret2-message_v2 = space.
-    ls_bapiret2-message_v3 = space.
-    ls_bapiret2-message_v4 = space.
-
-    " Adicionar à tabela de mensagens
-    APPEND ls_bapiret2 TO it_bapiret2.
-
-    " Se for erro, lançar exceção
-    IF iv_type CA 'EA'.
-      RAISE EXCEPTION TYPE zcx_to_error
-        EXPORTING
-          textid   = zcx_to_error=>business_error
-          previous = NEW zcx_to_error( text = iv_text )
-          msgty    = iv_type
-          msgid    = 'ZTO'
-          msgno    = iv_number
-          msgv1    = iv_text.
-    ENDIF.
-  ENDMETHOD.
-
-  METHOD has_errors.
-    DATA: ls_bapiret2 TYPE bapiret2.
-
-    rv_has_errors = abap_false.
-    LOOP AT it_bapiret2 INTO ls_bapiret2.
-      IF ls_bapiret2-type CA 'EA'.
-        rv_has_errors = abap_true.
-        EXIT.
-      ENDIF.
-    ENDLOOP.
-  ENDMETHOD.
-
-  METHOD create_log_entry.
-    DATA: ls_ballog TYPE bal_s_log,
-          ls_balmsg TYPE bal_s_msg,
-          lv_log_handle TYPE balloghndl.
-
-    " Preparar cabeçalho do log
-    ls_ballog-object = mv_object.
-    ls_ballog-subobject = mv_subobj.
-    ls_ballog-extnumber = mv_extnumber.
-    ls_ballog-aldate = sy-datum.
-    ls_ballog-altime = sy-uzeit.
-    ls_ballog-aluser = sy-uname.
-    ls_ballog-alprog = sy-repid.
-    ls_ballog-altext = 'Log de Erros - Baixa de Lubrificantes'.
-
-    " Adicionar mensagem ao log
-    ls_balmsg-msgty = iv_msgty.
-    ls_balmsg-msgv1 = iv_msgv1.
-    ls_balmsg-msgv2 = iv_msgv2.
-    ls_balmsg-msgv3 = iv_msgv3.
-    ls_balmsg-msgv4 = iv_msgv4.
-    ls_balmsg-msgid = iv_msgid.
-    ls_balmsg-msgno = iv_msgno.
-    ls_balmsg-msgv1 = iv_text.
-
-    " Criar log no SLG1
-    CALL FUNCTION 'BAL_LOG_CREATE'
-      EXPORTING
-        i_s_log = ls_ballog
-      IMPORTING
-        e_log_handle = lv_log_handle
-      EXCEPTIONS
-        OTHERS = 1.
-
-    IF sy-subrc = 0.
-      " Adicionar mensagem ao log
-      CALL FUNCTION 'BAL_LOG_MSG_ADD'
-        EXPORTING
-          i_log_handle = lv_log_handle
-          i_s_msg      = ls_balmsg
-        EXCEPTIONS
-          OTHERS = 1.
-
+    IF lt_errors IS NOT INITIAL.
+      " Pega o primeiro erro para gerar a exceção
+      READ TABLE lt_errors INTO ls_error INDEX 1.
       IF sy-subrc = 0.
-        " Salvar log
-        CALL FUNCTION 'BAL_DB_SAVE'
-          EXPORTING
-            i_save_all = abap_true
-          EXCEPTIONS
-            OTHERS = 1.
+        result = NEW zcx_to_error(
+          textid   = if_t100_message=>default
+          message  = format_bapiret2_message( ls_error )
+          error_code = generate_error_code( operation = operation bapiret2 = ls_error )
+        ).
       ENDIF.
     ENDIF.
   ENDMETHOD.
 
+  METHOD log_business_error.
+    DATA: ls_slg1 TYPE bal_s_log.
+
+    " Configuração do log
+    ls_slg1-aluser = sy-uname.
+    ls_slg1-alprog = sy-repid.
+    ls_slg1-aldate = sy-datum.
+    ls_slg1-altime = sy-uzeit.
+    ls_slg1-alobject = 'WM-TO'.
+    ls_slg1-alsubobj = operation.
+    ls_slg1-extnumber = error_code.
+    ls_slg1-alreason = 'BUSINESS_ERROR'.
+    ls_slg1-altext = message.
+
+    " Adiciona informações adicionais se existirem
+    IF additional_info IS NOT INITIAL.
+      ls_slg1-altext = ls_slg1-altext && ' - ' && additional_info.
+    ENDIF.
+
+    " Registra o log
+    CALL FUNCTION 'BAL_LOG_SAVE'
+      EXPORTING
+        i_s_log = ls_slg1
+      EXCEPTIONS
+        error_message = 1
+        OTHERS         = 2.
+
+    IF sy-subrc <> 0.
+      " Log de fallback em caso de falha no SLG1
+      MESSAGE 'Erro ao registrar log de negócio' TYPE 'E'.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD has_critical_error.
+    DATA: ls_error TYPE bapiret2.
+
+    " Verifica por erros críticos: estoque insuficiente, divergência de posições, etc.
+    LOOP AT bapiret2_tab INTO ls_error WHERE ( type = 'E' OR type = 'A' ).
+      CASE ls_error-id.
+        WHEN 'M7' OR 'WM' OR 'L_TO'. " Erros típicos de WM e TO
+          has_error = abap_true.
+          EXIT.
+        WHEN OTHERS.
+          IF ls_error-number BETWEEN '001' AND '099'.
+            has_error = abap_true.
+            EXIT.
+          ENDIF.
+      ENDCASE.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD format_bapiret2_message.
+    DATA: lv_message TYPE string.
+
+    " Formata a mensagem com todos os campos relevantes
+    CONCATENATE
+      ls_bapiret2-type
+      ls_bapiret2-id
+      ls_bapiret2-number
+      ls_bapiret2-message
+      INTO lv_message
+      SEPARATED BY space.
+
+    " Adiciona informações de log se existirem
+    IF ls_bapiret2-log_no IS NOT INITIAL AND ls_bapiret2-log_msg_no IS NOT INITIAL.
+      CONCATENATE lv_message '(Log:' ls_bapiret2-log_no '-' ls_bapiret2-log_msg_no ')' INTO lv_message.
+    ENDIF.
+
+    formatted_msg = lv_message.
+  ENDMETHOD.
+
+  METHOD get_error_type.
+    " Determina o tipo de erro com base na mensagem BAPIRET2
+    CASE bapiret2-id.
+      WHEN 'M7' OR 'WM'.
+        error_type = zto_error_type-stock.
+      WHEN 'L_TO'.
+        error_type = zto_error_type-position.
+      WHEN 'BAPI'.
+        error_type = zto_error_type-bapi.
+      WHEN OTHERS.
+        error_type = zto_error_type-unknown.
+    ENDCASE.
+  ENDMETHOD.
+
+  METHOD generate_error_code.
+    DATA: lv_prefix TYPE string.
+
+    " Gera prefixo baseado na operação
+    CASE operation.
+      WHEN 'CREATE'.
+        lv_prefix = 'TO_CREATE'.
+      WHEN 'CONFIRM'.
+        lv_prefix = 'TO_CONFIRM'.
+      WHEN OTHERS.
+        lv_prefix = 'TO'.
+    ENDCASE.
+
+    " Gera código completo
+    CONCATENATE lv_prefix '_' bapiret2-id '_' bapiret2-number INTO error_code.
+    TRANSLATE error_code TO UPPER CASE.
+  ENDMETHOD.
 ENDCLASS.
