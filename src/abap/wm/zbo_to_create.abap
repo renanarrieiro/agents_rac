@@ -1,8 +1,8 @@
 *&---------------------------------------------------------------------*
-*& Include           ZBO_TO_CREATE_CLS
+*& Include          ZBO_TO_CREATE_CLS
 *&---------------------------------------------------------------------*
 
-CLASS zcl_bo_to_create DEFINITION
+CLASS zbo_to_create DEFINITION
   PUBLIC
   FINAL
   CREATE PUBLIC.
@@ -18,131 +18,143 @@ CLASS zcl_bo_to_create DEFINITION
       IMPORTING
         !iv_squit TYPE c OPTIONAL
       RETURNING
-        VALUE(ro_result) TYPE REF TO ty_create_success
+        VALUE(rv_result) TYPE ty_create_success
       RAISING
-        cx_sy_arithmetic_error
-        cx_sy_conversion_error
-        cx_sy_dyn_call_error
-        cx_sy_parameter_not_found
-        cx_sy_subrc_not_0.
+        cx_root.
 
+  PROTECTED SECTION.
   PRIVATE SECTION.
     METHODS _call_fm_to_create
       IMPORTING
-        !iv_squit TYPE c
+        !iv_squit TYPE c OPTIONAL
       RETURNING
-        VALUE(rv_tanum) TYPE tanum
+        VALUE(rv_result) TYPE ty_create_success
       RAISING
-        cx_sy_arithmetic_error
-        cx_sy_conversion_error
-        cx_sy_dyn_call_error
-        cx_sy_parameter_not_found
-        cx_sy_subrc_not_0.
+        cx_root.
 
     METHODS _handle_messages
       IMPORTING
         !iv_tanum   TYPE tanum
         !iv_tapos   TYPE tapos
+        !iv_squit   TYPE c
+        !it_messages TYPE bapiret2_tab
       RETURNING
-        VALUE(rt_messages) TYPE bapiret2_tab.
+        VALUE(rv_result) TYPE ty_create_success.
 
+    METHODS _validate_input
+      IMPORTING
+        !iv_squit TYPE c
+      RAISING
+        cx_root.
 ENDCLASS.
 
 *&---------------------------------------------------------------------*
-*& Class (Implementation)       ZCL_BO_TO_CREATE
+*& Class (Implementation)  ZBO_TO_CREATE
 *&---------------------------------------------------------------------*
 
-CLASS zcl_bo_to_create IMPLEMENTATION.
-
+CLASS zbo_to_create IMPLEMENTATION.
   METHOD create.
-    DATA: lv_tanum   TYPE tanum,
-          lv_tapos   TYPE tapos,
-          lt_messages TYPE bapiret2_tab.
+    DATA: lv_result TYPE ty_create_success.
 
-    " Chamar o FM L_TO_CREATE_SINGLE
-    lv_tanum = _call_fm_to_create( iv_squit ).
+    " Validação de entrada
+    me->_validate_input( iv_squit ).
 
-    " Obter o número do item (TAPOS) - pode vir do retorno do FM ou ser calculado
-    lv_tapos = '0001'. " Valor padrão, pode ser ajustado conforme necessidade
+    " Chamar FM para criar TO
+    lv_result = me->_call_fm_to_create( iv_squit ).
 
     " Tratar mensagens
-    lt_messages = _handle_messages( lv_tanum, lv_tapos ).
-
-    " Montar estrutura de retorno
-    ro_result = NEW #( ).
-    ro_result->tanum   = lv_tanum.
-    ro_result->tapos   = lv_tapos.
-    ro_result->messages = lt_messages.
-
+    rv_result = me->_handle_messages(
+      iv_tanum   = lv_result-tanum
+      iv_tapos   = lv_result-tapos
+      iv_squit   = iv_squit
+      it_messages = lv_result-messages
+    ).
   ENDMETHOD.
 
   METHOD _call_fm_to_create.
-    DATA: ls_to_create_single TYPE l_to_create_single,
-          ls_return           TYPE bapiret2,
-          lv_subrc            TYPE sy-subrc.
+    DATA: ls_to_create  TYPE l_to_create_single,
+          ls_to_header  TYPE l_to_header_single,
+          ls_to_item    TYPE l_to_item_single,
+          ls_to_control TYPE l_to_control_single,
+          lt_messages   TYPE bapiret2_tab,
+          lv_tanum      TYPE tanum,
+          lv_tapos      TYPE tapos.
 
     " Preencher parâmetros fixos e variáveis conforme EF
-    " Campos obrigatórios do FM L_TO_CREATE_SINGLE
-    ls_to_create_single-lgnum   = '1001'. " Número do armazém - valor fixo conforme EF
-    ls_to_create_single-lgtyp   = '601'.  " Tipo de TO - valor fixo conforme EF
-    ls_to_create_single-matnr   = 'LUBRIF001'. " Material - valor fixo conforme EF
-    ls_to_create_single-werks   = '1000'. " Centro - valor fixo conforme EF
-    ls_to_create_single-lgort   = '0010'. " Local de armazenamento - valor fixo conforme EF
-    ls_to_create_single-charg   = 'BATCH001'. " Número de lote - valor fixo conforme EF
-    ls_to_create_single-batch   = 'BATCH001'. " Número de lote (alternativo)
-    ls_to_create_single-qty     = '1'.    " Quantidade - valor fixo conforme EF
-    ls_to_create_single-meins   = 'UN'.   " Unidade de medida - valor fixo conforme EF
-    ls_to_create_single-squit   = iv_squit. " Indicador de confirmação
+    ls_to_header-lgnum = '1000'. " Número do armazém - valor fixo conforme EF
+    ls_to_header-lgtyp = '601'.  " Tipo de TO - valor fixo conforme EF
+    ls_to_header-werks = '1000'. " Centro - valor fixo conforme EF
 
-    " Campos opcionais conforme necessidade
-    ls_to_create_single-vbeln   = '4500001234'. " Documento de referência
-    ls_to_create_single-posnr   = '00010'.       " Posição do documento
+    " Preencher itens da TO
+    ls_to_item-matnr = 'LUBRIF001'. " Material - valor fixo conforme EF
+    ls_to_item-batch = 'BATCH001'.  " Lote - valor fixo conforme EF
+    ls_to_item-lgort = '0001'.      " Local de armazenamento - valor fixo conforme EF
+    ls_to_item-qty   = '10'.        " Quantidade - valor fixo conforme EF
 
-    " Chamar o FM L_TO_CREATE_SINGLE
+    " Preencher controle
+    ls_to_control-immediate = iv_squit. " Se I_SQUIT = 'X', a TO nasce confirmada
+
+    " Chamar FM L_TO_CREATE_SINGLE
     CALL FUNCTION 'L_TO_CREATE_SINGLE'
       EXPORTING
-        to_create_single = ls_to_create_single
+        i_to_header  = ls_to_header
+        i_to_item    = ls_to_item
+        i_to_control = ls_to_control
       IMPORTING
-        tanum            = rv_tanum
-        tapos            = ls_return-tapos
+        e_tanum      = lv_tanum
+        e_tapos      = lv_tapos
       TABLES
-        return           = ls_return
+        t_messages   = lt_messages
       EXCEPTIONS
-        OTHERS           = 1.
+        error_message = 1
+        OTHERS       = 2.
 
-    " Verificar se houve erro
+    " Tratar exceções
     IF sy-subrc <> 0.
-      RAISE EXCEPTION TYPE cx_sy_subrc_not_0
-        WITH MESSAGE TEXT-001. " Erro ao criar TO
+      RAISE EXCEPTION TYPE cx_static_check
+        MESSAGE ID 'L_TO_CREATE_SINGLE'
+        TYPE 'E'
+        NUMBER '001'
+        WITH 'Erro ao criar TO'.
     ENDIF.
 
-    " Verificar mensagens de erro no retorno
-    IF ls_return-type = 'E' OR ls_return-type = 'A'.
-      RAISE EXCEPTION TYPE cx_sy_subrc_not_0
-        WITH MESSAGE ls_return-message.
-    ENDIF.
-
+    " Retornar resultado
+    rv_result-tanum   = lv_tanum.
+    rv_result-tapos   = lv_tapos.
+    rv_result-messages = lt_messages.
   ENDMETHOD.
 
   METHOD _handle_messages.
-    DATA: ls_message TYPE bapiret2.
+    DATA: lv_message TYPE string.
 
     " Adicionar mensagem de sucesso
-    ls_message-type   = 'S'.
-    ls_message-id     = 'ZWM'.
-    ls_message-number = '000'.
-    ls_message-message = |TO criada com sucesso: { iv_tanum } - { iv_tapos }|.
-    APPEND ls_message TO rt_messages.
-
-    " Adicionar mensagem de confirmação se aplicável
-    IF iv_tapos = '0001'.
-      ls_message-type   = 'S'.
-      ls_message-id     = 'ZWM'.
-      ls_message-number = '001'.
-      ls_message-message = 'Item confirmado automaticamente.'.
-      APPEND ls_message TO rt_messages.
+    IF iv_tanum IS NOT INITIAL AND iv_tapos IS NOT INITIAL.
+      lv_message = |TO criada com sucesso: { iv_tanum } - { iv_tapos }|.
+      APPEND VALUE #( type = 'S' id = 'ZBO_TO_CREATE' number = '000' message = lv_message ) TO rv_result-messages.
     ENDIF.
 
+    " Adicionar mensagem sobre confirmação
+    IF iv_squit = 'X'.
+      lv_message = 'TO criada e confirmada imediatamente.'.
+      APPEND VALUE #( type = 'S' id = 'ZBO_TO_CREATE' number = '001' message = lv_message ) TO rv_result-messages.
+    ELSE.
+      lv_message = 'TO criada, aguardando confirmação separada.'.
+      APPEND VALUE #( type = 'S' id = 'ZBO_TO_CREATE' number = '002' message = lv_message ) TO rv_result-messages.
+    ENDIF.
+
+    " Manter mensagens do FM
+    rv_result-messages = VALUE #( BASE rv_result-messages
+                                  ( LINES OF it_messages ) ).
   ENDMETHOD.
 
+  METHOD _validate_input.
+    " Validação básica do parâmetro I_SQUIT
+    IF iv_squit IS NOT INITIAL AND iv_squit <> 'X'.
+      RAISE EXCEPTION TYPE cx_static_check
+        MESSAGE ID 'ZBO_TO_CREATE'
+        TYPE 'E'
+        NUMBER '001'
+        WITH 'Parâmetro I_SQUIT deve ser vazio ou ''X'''.
+    ENDIF.
+  ENDMETHOD.
 ENDCLASS.
