@@ -1,9 +1,9 @@
 *&---------------------------------------------------------------------*
-*& Classe de exceção customizada para transações de Transfer Order
+*& Classe de exceção customizada para erros de Transfer Order
 *&---------------------------------------------------------------------*
 CLASS zcx_to_error DEFINITION
   PUBLIC
-  INHERITING FROM cx_root
+  INHERITING FROM cx_static_check
   CREATE PUBLIC.
 
   PUBLIC SECTION.
@@ -13,55 +13,41 @@ CLASS zcx_to_error DEFINITION
       IMPORTING
         !textid   LIKE if_t100_message=>t100key OPTIONAL
         !previous LIKE previous OPTIONAL
-        !msg_type TYPE bapiret2-type DEFAULT 'E'
-        !msg_id   TYPE bapiret2-id DEFAULT 'ZTO'
-        !msg_number TYPE bapiret2-number
-        !msg_text TYPE bapiret2-message OPTIONAL
-        !msg_v1 TYPE bapiret2-message_v1 OPTIONAL
-        !msg_v2 TYPE bapiret2-message_v2 OPTIONAL
-        !msg_v3 TYPE bapiret2-message_v3 OPTIONAL
-        !msg_v4 TYPE bapiret2-message_v4 OPTIONAL.
+        !message  TYPE string OPTIONAL
+        !severity TYPE zif_to_error_handler=>ty_severity OPTIONAL.
 
+    "! Atributos para armazenar informações do erro
     DATA:
-      msg_type   TYPE bapiret2-type,
-      msg_id     TYPE bapiret2-id,
-      msg_number TYPE bapiret2-number,
-      msg_text   TYPE bapiret2-message,
-      msg_v1     TYPE bapiret2-message_v1,
-      msg_v2     TYPE bapiret2-message_v2,
-      msg_v3     TYPE bapiret2-message_v3,
-      msg_v4     TYPE bapiret2-message_v4,
-      log_no     TYPE bapiret2-log_no,
-      log_msg_no TYPE bapiret2-log_msg_no.
+      severity    TYPE zif_to_error_handler=>ty_severity READ-ONLY,
+      custom_code TYPE string READ-ONLY,
+      details     TYPE bapiret2_t READ-ONLY.
 
+  PROTECTED SECTION.
   PRIVATE SECTION.
-    CLASS-DATA:
-      message_text TYPE string.
-
+    "! Atributo para armazenar severidade do erro
+    DATA mv_severity TYPE zif_to_error_handler=>ty_severity.
 ENDCLASS.
 
 *&---------------------------------------------------------------------*
 *& Implementação da classe de exceção
 *&---------------------------------------------------------------------*
 CLASS zcx_to_error IMPLEMENTATION.
-
   METHOD constructor.
     super->constructor( textid = textid previous = previous ).
-
-    me->msg_type   = msg_type.
-    me->msg_id     = msg_id.
-    me->msg_number = msg_number.
-    me->msg_text   = msg_text.
-    me->msg_v1     = msg_v1.
-    me->msg_v2     = msg_v2.
-    me->msg_v3     = msg_v3.
-    me->msg_v4     = msg_v4.
-
-    IF textid IS INITIAL.
-      if_t100_message~t100key = if_t100_message=>default_textid.
-    ELSE.
-      if_t100_message~t100key = textid.
+    
+    " Armazenar mensagem personalizada
+    IF message IS NOT INITIAL.
+      me->msgv1 = message.
+    ENDIF.
+    
+    " Armazenar severidade
+    IF severity IS SUPPLIED.
+      mv_severity = severity.
+    ENDIF.
+    
+    " Definir texto padrão se não informado
+    IF textid IS NOT SUPPLIED.
+      textid = if_t100_message=>default_textid.
     ENDIF.
   ENDMETHOD.
-
 ENDCLASS.
