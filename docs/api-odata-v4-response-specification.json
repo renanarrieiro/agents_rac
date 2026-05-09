@@ -1,0 +1,222 @@
+{
+  "api_name": "WM: Sisma Baixa Lubrificantes - API OData V4",
+  "version": "1.0",
+  "description": "Especificação de formato de resposta JSON para API OData V4 de baixa lubrificante",
+  "date": "2026-05-09",
+  "response_formats": {
+    "success": {
+      "http_status": 201,
+      "content_type": "application/json;odata.metadata=minimal;odata.streaming=true",
+      "structure": {
+        "@odata.context": "$metadata#WM_LubricantIssue",
+        "@odata.type": "#WM_LubricantIssue",
+        "value": {
+          "Tanum": "TO123456",
+          "Ebeln": "4500001234",
+          "Ebelp": "00010",
+          "Matnr": "LUBR-001",
+          "Werks": "1000",
+          "Lgort": "L001",
+          "Menge": "100.000",
+          "Meins": "KG",
+          "Budat": "2026-05-09",
+          "Ernam": "JOHN_DOE",
+          "Erdat": "2026-05-09",
+          "Message": "Baixa de lubrificante realizada com sucesso"
+        }
+      },
+      "example": {
+        "@odata.context": "$metadata#WM_LubricantIssue",
+        "@odata.type": "#WM_LubricantIssue",
+        "value": {
+          "Tanum": "TO123456",
+          "Ebeln": "4500001234",
+          "Ebelp": "00010",
+          "Matnr": "LUBR-001",
+          "Werks": "1000",
+          "Lgort": "L001",
+          "Menge": "100.000",
+          "Meins": "KG",
+          "Budat": "2026-05-09",
+          "Ernam": "JOHN_DOE",
+          "Erdat": "2026-05-09",
+          "Message": "Baixa de lubrificante realizada com sucesso"
+        }
+      }
+    },
+    "error": {
+      "http_status_codes": {
+        "400": "Bad Request - Erros de validação de dados",
+        "401": "Unauthorized - Autenticação/autorização falhou",
+        "403": "Forbidden - Permissão negada",
+        "404": "Not Found - Recurso não encontrado",
+        "422": "Unprocessable Entity - Erros de negócio",
+        "500": "Internal Server Error - Erro interno do servidor"
+      },
+      "content_type": "application/json;odata.error=true",
+      "structure": {
+        "error": {
+          "code": "WM_LUBRICANT_ISSUE_ERROR",
+          "message": {
+            "lang": "pt-BR",
+            "value": "Descrição detalhada do erro"
+          },
+          "target": "/WM_LubricantIssue",
+          "details": [
+            {
+              "code": "VALIDATION_ERROR",
+              "message": {
+                "lang": "pt-BR",
+                "value": "Mensagem de erro específica"
+              },
+              "target": "field_name"
+            }
+          ],
+          "innererror": {
+            "transactionid": "12345678-1234-1234-1234-123456789012",
+            "timestamp": "2026-05-09T16:07:51.885650Z",
+            "trace": "Stack trace do erro"
+          }
+        }
+      },
+      "examples": {
+        "400_bad_request": {
+          "error": {
+            "code": "WM_LUBRICANT_ISSUE_ERROR",
+            "message": {
+              "lang": "pt-BR",
+              "value": "Dados inválidos fornecidos na requisição"
+            },
+            "target": "/WM_LubricantIssue",
+            "details": [
+              {
+                "code": "MISSING_REQUIRED_FIELD",
+                "message": {
+                  "lang": "pt-BR",
+                  "value": "Campo obrigatório 'Matnr' não informado"
+                },
+                "target": "Matnr"
+              },
+              {
+                "code": "INVALID_FIELD_VALUE",
+                "message": {
+                  "lang": "pt-BR",
+                  "value": "Valor inválido para campo 'Menge': deve ser número positivo"
+                },
+                "target": "Menge"
+              }
+            ],
+            "innererror": {
+              "transactionid": "12345678-1234-1234-1234-123456789012",
+              "timestamp": "2026-05-09T16:07:51.885650Z",
+              "trace": "CL_WM_LUBRICANT_ISSUE=>VALIDATE_DATA"
+            }
+          }
+        },
+        "404_not_found": {
+          "error": {
+            "code": "WM_LUBRICANT_NOT_FOUND",
+            "message": {
+              "lang": "pt-BR",
+              "value": "Lubrificante não encontrado no armazém"
+            },
+            "target": "/WM_LubricantIssue",
+            "details": [
+              {
+                "code": "MATERIAL_NOT_FOUND",
+                "message": {
+                  "lang": "pt-BR",
+                  "value": "Material 'LUBR-999' não encontrado no armazém '1000/L001'"
+                },
+                "target": "Matnr"
+              }
+            ],
+            "innererror": {
+              "transactionid": "12345678-1234-1234-1234-123456789012",
+              "timestamp": "2026-05-09T16:07:51.885650Z",
+              "trace": "CL_WM_LUBRICANT_ISSUE=>CHECK_MATERIAL_AVAILABILITY"
+            }
+          }
+        },
+        "422_unprocessable_entity": {
+          "error": {
+            "code": "WM_BUSINESS_RULE_VIOLATION",
+            "message": {
+              "lang": "pt-BR",
+              "value": "Violação de regra de negócio"
+            },
+            "target": "/WM_LubricantIssue",
+            "details": [
+              {
+                "code": "INSUFFICIENT_STOCK",
+                "message": {
+                  "lang": "pt-BR",
+                  "value": "Estoque insuficiente. Disponível: 50.000 kg, Solicitado: 100.000 kg"
+                },
+                "target": "Menge"
+              },
+              {
+                "code": "EXPIRED_MATERIAL",
+                "message": {
+                  "lang": "pt-BR",
+                  "value": "Material vencido. Data de validade: 2025-12-31"
+                },
+                "target": "Matnr"
+              }
+            ],
+            "innererror": {
+              "transactionid": "12345678-1234-1234-1234-123456789012",
+              "timestamp": "2026-05-09T16:07:51.885650Z",
+              "trace": "CL_WM_LUBRICANT_ISSUE=>VALIDATE_BUSINESS_RULES"
+            }
+          }
+        },
+        "500_internal_server_error": {
+          "error": {
+            "code": "WM_SYSTEM_ERROR",
+            "message": {
+              "lang": "pt-BR",
+              "value": "Erro interno do sistema ao processar baixa de lubrificante"
+            },
+            "target": "/WM_LubricantIssue",
+            "details": [
+              {
+                "code": "DATABASE_ERROR",
+                "message": {
+                  "lang": "pt-BR",
+                  "value": "Falha ao acessar banco de dados"
+                },
+                "target": "database_operation"
+              }
+            ],
+            "innererror": {
+              "transactionid": "12345678-1234-1234-1234-123456789012",
+              "timestamp": "2026-05-09T16:07:51.885650Z",
+              "trace": "CL_WM_LUBRICANT_ISSUE=>CREATE_TRANSFER_ORDER"
+            }
+          }
+        }
+      }
+    }
+  },
+  "odata_conformance": {
+    "version": "4.0",
+    "standards": [
+      "OData JSON Format",
+      "OData Error Response Format",
+      "OData Metadata Format"
+    ],
+    "conformance_level": "Full"
+  },
+  "error_codes": {
+    "WM_LUBRICANT_ISSUE_ERROR": "Erro genérico de baixa de lubrificante",
+    "MISSING_REQUIRED_FIELD": "Campo obrigatório não informado",
+    "INVALID_FIELD_VALUE": "Valor inválido para campo",
+    "MATERIAL_NOT_FOUND": "Material não encontrado",
+    "INSUFFICIENT_STOCK": "Estoque insuficiente",
+    "EXPIRED_MATERIAL": "Material vencido",
+    "DATABASE_ERROR": "Erro de banco de dados",
+    "AUTHENTICATION_FAILED": "Falha na autenticação",
+    "AUTHORIZATION_FAILED": "Falha na autorização"
+  }
+}
