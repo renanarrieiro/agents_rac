@@ -16,27 +16,18 @@ CLASS zcx_to_error DEFINITION
         !message  TYPE string OPTIONAL
         !error_code TYPE zto_error_code OPTIONAL.
 
-    "! Código de erro customizado
     DATA error_code TYPE zto_error_code READ-ONLY.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
 ENDCLASS.
 
-*&---------------------------------------------------------------------*
-*& Implementação da classe de exceção
-*&---------------------------------------------------------------------*
 CLASS zcx_to_error IMPLEMENTATION.
   METHOD constructor.
     super->constructor( textid = textid previous = previous ).
-
-    IF textid IS INITIAL.
-      if_t100_message~t100key = if_t100_message=>default_textid.
-    ELSE.
-      if_t100_message~t100key = textid.
-    ENDIF.
-
     me->error_code = error_code.
-    me->msgv1 = message.
+    IF message IS NOT INITIAL.
+      me->msgv1 = message.
+    ENDIF.
   ENDMETHOD.
 ENDCLASS.
