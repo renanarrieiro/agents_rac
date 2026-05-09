@@ -1,8 +1,7 @@
 *&---------------------------------------------------------------------*
-*&  Class ZCX_TO_ERROR
+*&  Include           ZCX_TO_ERROR
 *&---------------------------------------------------------------------*
 * Classe de exceção customizada para erros de Transfer Order
-*---------------------------------------------------------------------*
 CLASS zcx_to_error DEFINITION
   PUBLIC
   INHERITING FROM cx_static_check
@@ -15,36 +14,31 @@ CLASS zcx_to_error DEFINITION
       IMPORTING
         !textid   LIKE if_t100_message=>t100key OPTIONAL
         !previous LIKE previous OPTIONAL
-        !matnr    TYPE matnr OPTIONAL
-        !werks    TYPE werks_d OPTIONAL
-        !lgort    TYPE lgort_d OPTIONAL
-        !tanim    TYPE tanum OPTIONAL
-        !tapos    TYPE tapos OPTIONAL
-        !message  TYPE string OPTIONAL.
+        !message  TYPE string OPTIONAL
+        !error_code TYPE string OPTIONAL
+        !error_type TYPE string OPTIONAL
+        !details TYPE string OPTIONAL.
 
-    DATA:
-      matnr    TYPE matnr,
-      werks    TYPE werks_d,
-      lgort    TYPE lgort_d,
-      tanim    TYPE tanum,
-      tapos    TYPE tapos,
-      message  TYPE string.
+    DATA error_code TYPE string READ-ONLY.
+    DATA error_type TYPE string READ-ONLY.
+    DATA details TYPE string READ-ONLY.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
 ENDCLASS.
 
 *&---------------------------------------------------------------------*
-*&  Class ZCX_TO_ERROR IMPLEMENTATION
+*&  Class ZCX_TO_ERROR Implementation
 *&---------------------------------------------------------------------*
 CLASS zcx_to_error IMPLEMENTATION.
-  METHOD constructor ##ADT_SUPPRESS_GENERATION.
+  METHOD constructor.
     super->constructor( textid = textid previous = previous ).
-    me->matnr  = matnr.
-    me->werks  = werks.
-    me->lgort  = lgort.
-    me->tanim  = tanim.
-    me->tapos  = tapos.
-    me->message = message.
+    me->error_code = error_code.
+    me->error_type = error_type.
+    me->details = details.
+    
+    IF message IS NOT INITIAL.
+      me->if_t100_message~t100key-msgv1 = message.
+    ENDIF.
   ENDMETHOD.
 ENDCLASS.
