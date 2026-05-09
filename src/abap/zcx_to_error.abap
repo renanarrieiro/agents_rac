@@ -1,7 +1,8 @@
 *&---------------------------------------------------------------------*
-*&  Include           ZCX_TO_ERROR
+*&  Class ZCX_TO_ERROR
 *&---------------------------------------------------------------------*
 * Classe de exceção customizada para erros de Transfer Order
+*&---------------------------------------------------------------------*
 CLASS zcx_to_error DEFINITION
   PUBLIC
   INHERITING FROM cx_static_check
@@ -15,13 +16,19 @@ CLASS zcx_to_error DEFINITION
         !textid   LIKE if_t100_message=>t100key OPTIONAL
         !previous LIKE previous OPTIONAL
         !message  TYPE string OPTIONAL
-        !error_code TYPE string OPTIONAL
-        !error_type TYPE string OPTIONAL
-        !details TYPE string OPTIONAL.
+        !matnr    TYPE matnr OPTIONAL
+        !werks    TYPE werks_d OPTIONAL
+        !lgort    TYPE lgort_d OPTIONAL
+        !tannum   TYPE tanum OPTIONAL
+        !tapos    TYPE tapos OPTIONAL
+        !bapiret2 TYPE bapiret2 OPTIONAL.
 
-    DATA error_code TYPE string READ-ONLY.
-    DATA error_type TYPE string READ-ONLY.
-    DATA details TYPE string READ-ONLY.
+    DATA matnr TYPE matnr.
+    DATA werks TYPE werks_d.
+    DATA lgort TYPE lgort_d.
+    DATA tannum TYPE tanum.
+    DATA tapos TYPE tapos.
+    DATA bapiret2 TYPE bapiret2.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -33,12 +40,15 @@ ENDCLASS.
 CLASS zcx_to_error IMPLEMENTATION.
   METHOD constructor.
     super->constructor( textid = textid previous = previous ).
-    me->error_code = error_code.
-    me->error_type = error_type.
-    me->details = details.
+    me->matnr = matnr.
+    me->werks = werks.
+    me->lgort = lgort.
+    me->tannum = tannum.
+    me->tapos = tapos.
+    me->bapiret2 = bapiret2.
     
     IF message IS NOT INITIAL.
-      me->if_t100_message~t100key-msgv1 = message.
+      me->msgv1 = message.
     ENDIF.
   ENDMETHOD.
 ENDCLASS.
