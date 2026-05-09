@@ -7,69 +7,62 @@ CLASS zcx_to_error DEFINITION
   CREATE PUBLIC.
 
   PUBLIC SECTION.
-    INTERFACES if_t100_message.
+    "! Construtor padrão
+    METHODS constructor
+      IMPORTING
+        !textid   LIKE if_t100_message=>t100key OPTIONAL
+        !previous LIKE previous OPTIONAL
+        !message  TYPE string OPTIONAL
+        !error_code TYPE zto_error_code OPTIONAL.
 
-    CONSTANTS:
-      BEGIN OF business_error,
-        msgid   TYPE symsgid VALUE 'ZTO',
-        msgno   TYPE symsgno VALUE '001',
-        attr1   TYPE scattr1 VALUE 'MATNR',
-        attr2   TYPE scattr2 VALUE 'WERKS',
-        attr3   TYPE scattr3 VALUE 'LGORT',
-        attr4   TYPE scattr4 VALUE 'CHARG',
-      END OF business_error,
-      BEGIN OF system_error,
-        msgid   TYPE symsgid VALUE 'ZTO',
-        msgno   TYPE symsgno VALUE '002',
-        attr1   TYPE scattr1 VALUE 'SUBRC',
-        attr2   TYPE scattr2 VALUE 'FM_NAME',
-        attr3   TYPE scattr3 VALUE 'ERROR_TEXT',
-        attr4   TYPE scattr4 VALUE '',
-      END OF system_error,
-      BEGIN OF validation_error,
-        msgid   TYPE symsgid VALUE 'ZTO',
-        msgno   TYPE symsgno VALUE '003',
-        attr1   TYPE scattr1 VALUE 'FIELD_NAME',
-        attr2   TYPE scattr2 VALUE 'EXPECTED_VALUE',
-        attr3   TYPE scattr3 VALUE 'ACTUAL_VALUE',
-        attr4   TYPE scattr4 VALUE '',
-      END OF validation_error,
-      BEGIN OF inventory_error,
-        msgid   TYPE symsgid VALUE 'ZTO',
-        msgno   TYPE symsgno VALUE '004',
-        attr1   TYPE scattr1 VALUE 'MATNR',
-        attr2   TYPE scattr2 VALUE 'WERKS',
-        attr3   TYPE scattr3 VALUE 'LGORT',
-        attr4   TYPE scattr4 VALUE 'REQUIRED_QTY',
-      END OF inventory_error,
-      BEGIN OF position_error,
-        msgid   TYPE symsgid MESSAGE ID 'ZTO' NUMBER '005',
-        attr1   TYPE scattr1 VALUE 'FROM_LGORT',
-        attr2   TYPE scattr2 VALUE 'TO_LGORT',
-        attr3   TYPE scattr3 VALUE 'EXPECTED_POS',
-        attr4   TYPE scattr4 VALUE 'ACTUAL_POS',
-      END OF position_error.
-
-    METHODS:
-      constructor
-        IMPORTING
-          !textid   LIKE if_t100_message=>t100key OPTIONAL
-          !previous LIKE previous OPTIONAL
-          !bauret2  TYPE bapiret2 OPTIONAL
-          !message  TYPE string OPTIONAL.
-
+    "! Atributos para armazenar informações do erro
     DATA:
-      bauret2 TYPE bapiret2 READ-ONLY,
-      message TYPE string READ-ONLY.
+      "! Código de erro customizado
+      error_code TYPE zto_error_code,
+      "! Mensagem detalhada
+      error_message TYPE string,
+      "! Tipo de erro (E=Erro, W=Aviso, I=Informação, S=Sucesso)
+      error_type TYPE bapiret2-type,
+      "! ID da mensagem
+      error_id TYPE bapiret2-id,
+      "! Número da mensagem
+      error_number TYPE bapiret2-number,
+      "! Número do log
+      log_no TYPE bapiret2-log_no,
+      "! Número da mensagem do log
+      log_msg_no TYPE bapiret2-log_msg_no,
+      "! Variáveis de mensagem V1-V4
+      message_v1 TYPE bapiret2-message_v1,
+      message_v2 TYPE bapiret2-message_v2,
+      message_v3 TYPE bapiret2-message_v3,
+      message_v4 TYPE bapiret2-message_v4.
 
-  PROTECTED SECTION.
   PRIVATE SECTION.
+    "! Constantes para códigos de erro
+    CONSTANTS:
+      BEGIN OF error_codes,
+        estoque_insuficiente TYPE zto_error_code VALUE '001',
+        divergencia_posicoes TYPE zto_error_code VALUE '002',
+        fm_create_error     TYPE zto_error_code VALUE '003',
+        fm_confirm_error    TYPE zto_error_code VALUE '004',
+        sistema_error       TYPE zto_error_code VALUE '005',
+        validacao_error     TYPE zto_error_code VALUE '006',
+      END OF error_codes.
+
 ENDCLASS.
 
+*&---------------------------------------------------------------------*
+*& Implementação da classe de exceção
+*&---------------------------------------------------------------------*
 CLASS zcx_to_error IMPLEMENTATION.
   METHOD constructor.
     super->constructor( textid = textid previous = previous ).
-    me->bauret2 = bauret2.
-    me->message = message.
+    me->error_code = error_code.
+    me->error_message = message.
+    
+    "! Define tipo de erro padrão como 'E' (Erro)
+    IF me->error_type IS INITIAL.
+      me->error_type = 'E'.
+    ENDIF.
   ENDMETHOD.
 ENDCLASS.
