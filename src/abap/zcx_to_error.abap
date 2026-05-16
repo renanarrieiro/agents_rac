@@ -1,7 +1,7 @@
 *&---------------------------------------------------------------------*
 *&  Class ZCX_TO_ERROR
 *&---------------------------------------------------------------------*
-* Classe de exceção customizada para erros de Transfer Order
+*
 *&---------------------------------------------------------------------*
 CLASS zcx_to_error DEFINITION
   PUBLIC
@@ -15,25 +15,27 @@ CLASS zcx_to_error DEFINITION
       IMPORTING
         !textid   LIKE if_t100_message=>t100key OPTIONAL
         !previous LIKE previous OPTIONAL
-        !message  TYPE string OPTIONAL
         !matnr    TYPE matnr OPTIONAL
         !werks    TYPE werks_d OPTIONAL
         !lgort    TYPE lgort_d OPTIONAL
-        !tanim    TYPE tanim OPTIONAL
-        !ta_posnr TYPE ta_posnr OPTIONAL.
+        !message  TYPE string OPTIONAL
+        !log_no   TYPE balnrext OPTIONAL
+        !log_msg_no TYPE balmsgno OPTIONAL.
 
-    DATA matnr    TYPE matnr.
-    DATA werks    TYPE werks_d.
-    DATA lgort    TYPE lgort_d.
-    DATA tanim    TYPE tanim.
-    DATA ta_posnr TYPE ta_posnr.
+    DATA:
+      matnr    TYPE matnr,
+      werks    TYPE werks_d,
+      lgort    TYPE lgort_d,
+      message  TYPE string,
+      log_no   TYPE balnrext,
+      log_msg_no TYPE balmsgno.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
 ENDCLASS.
 
 *&---------------------------------------------------------------------*
-*&  Class ZCX_TO_ERROR Implementation
+*&  Class ZCX_TO_ERROR > Implementation
 *&---------------------------------------------------------------------*
 CLASS zcx_to_error IMPLEMENTATION.
   METHOD constructor.
@@ -41,11 +43,8 @@ CLASS zcx_to_error IMPLEMENTATION.
     me->matnr    = matnr.
     me->werks    = werks.
     me->lgort    = lgort.
-    me->tanim    = tanim.
-    me->ta_posnr = ta_posnr.
-    
-    IF message IS NOT INITIAL.
-      me->if_t100_message~t100key-msgv1 = message.
-    ENDIF.
+    me->message  = message.
+    me->log_no   = log_no.
+    me->log_msg_no = log_msg_no.
   ENDMETHOD.
 ENDCLASS.
